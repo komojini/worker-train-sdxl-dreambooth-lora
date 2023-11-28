@@ -2,7 +2,8 @@
 
 import torch
 from diffusers import StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline
-from ..src.config import MODEL_PATH
+
+MODEL_PATH = "stabilityai/stable-diffusion-xl-base-1.0"
 
 def fetch_pretrained_model(model_class, model_name, **kwargs):
     '''

@@ -145,7 +145,9 @@ def handler(job):
             return {"error": validated_s3_config['errors']}
         s3_config = validated_s3_config['validated_input']
     
-    job_output = {}
+    job_output = {
+        "lora_model_id": lora_model_id,
+    }
 
     # --------------------------------- Train ----------------------------------- #
     tmp_dir = Path("/tmp")
@@ -209,6 +211,11 @@ def handler(job):
             bucket_name=job["s3Config"]["bucketName"],
         )
     
+    rp_cleanup.clean(
+        [
+            tmp_dir,
+        ]
+    )
     return job_output
 
 

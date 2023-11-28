@@ -7,7 +7,7 @@ import subprocess
 import torch
 from pathlib import Path
 from requests.adapters import HTTPAdapter, Retry
-
+from PIL import Image
 import runpod
 from runpod.serverless.utils import rp_download, upload_file_to_bucket, upload_in_memory_object
 from runpod.serverless.utils.rp_validator import validate
@@ -23,7 +23,33 @@ from rp_schemas import TRAIN_SCHEMA, S3_SCHEMA
 torch.cuda.empty_cache()
 
 
-def download_and_preprocess_images(images_url: str, output_dir: Path | str):
+def crop_image(image_path, save_path):
+    # Open the image
+    image = Image.open(image_path)
+
+    # Crop the image (example cropping to a square in the center)
+    width, height = image.size
+    min_dimension = min(width, height)
+    left = (width - min_dimension) / 2
+    top = (height - min_dimension) / 2
+    right = (width + min_dimension) / 2
+    bottom = (height + min_dimension) / 2
+    cropped_image = image.crop((left, top, right, bottom))
+
+    # Resize the cropped image to 512x512 pixels
+    new_size = (RESOLUTION, RESOLUTION)
+    resized_image = cropped_image.resize(new_size)
+
+    # Save the cropped and resized image
+    resized_image.save(save_path)
+    return save_path
+
+
+
+def download_and_preprocess_images(
+        images_url: str, 
+        output_dir: Path | str
+    ) -> Path | str:
 
     downloaded_images: dict = rp_download.file(images_url)
 
@@ -34,11 +60,15 @@ def download_and_preprocess_images(images_url: str, output_dir: Path | str):
             continue
         for file in files:
             file_path = os.path.join(root, file)
+            crop_image(file_path, file_path) 
+
             if os.path.splitext(file_path)[1].lower() in [".jpg", ".jpeg", ".png"]:
                 shutil.copy(
                     os.path.join(downloaded_images["extracted_path"], file_path),
                     output_dir,
                 )
+    return output_dir
+
 def train(
         instance_data_dir: str, 
         output_dir: str,
@@ -92,10 +122,6 @@ def train(
 def handler(job):
     
     job_input = job['input']
-    lora_model_id = job_input.get('lora_model_id', None)
-    if lora_model_id is None:
-        lora_model_id = base64.b64encode(os.urandom(9)).decode('utf-8')
-    job_input["lora_model_id"] = lora_model_id
 
     # -------------------------------- Validation -------------------------------- #
     # Validate the training input
@@ -106,7 +132,11 @@ def handler(job):
     if 'errors' in validated_train_input:
         return {"error": validated_train_input['errors']}
     train_input = validated_train_input['validated_input']
-
+    lora_model_id = train_input.get("lora_model_id", None)
+    if lora_model_id is None:
+        lora_model_id = base64.b64encode(os.urandom(9)).decode('utf-8')
+    
+    train_input["lora_model_id"] = lora_model_id
 
     # Validate the S3 config, if provided
     s3_config = None
@@ -118,7 +148,11 @@ def handler(job):
     
     job_output = {}
 
+    # --------------------------------- Train ----------------------------------- #
     tmp_dir = Path("/tmp")
+    if not os.path.exists(tmp_dir):
+        os.makedirs(tmp_dir, exist_ok=True)
+    
     output_dir = tmp_dir / lora_model_id / "output"
     instance_data_dir = tmp_dir / lora_model_id / "instance_data"
 

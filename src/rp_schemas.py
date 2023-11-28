@@ -1,5 +1,10 @@
 
 TRAIN_SCHEMA = {
+    "lora_model_id": {
+        "type": str,
+        "required": False,
+        "default": None
+    },
     "data_url": {
         "type": str,
         "required": True

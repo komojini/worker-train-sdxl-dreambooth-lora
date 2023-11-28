@@ -6,7 +6,6 @@ import requests
 import subprocess
 import torch
 from pathlib import Path
-from requests.adapters import HTTPAdapter, Retry
 from PIL import Image
 import runpod
 from runpod.serverless.utils import rp_download, upload_file_to_bucket, upload_in_memory_object
